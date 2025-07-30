@@ -17,16 +17,19 @@ import numpy as np
 import shapefile as shp
 from shapely.geometry import Point, Polygon
 
-# Define data directory
-DATA_DIR = '/data/users/andre.lanyon/QNH'
-CYCLE_POINT = '20250713T1800Z'
-MOO_DIR = 'moose:/adhoc/users/ppdev'
+# Define environment constants
+DATA_DIR = os.environ['DATA_DIR']
+CYCLE_POINT = os.environ['CYCLE_POINT']
+MOO_DIR = os.environ['MOO_DIR']
+
+# Other constants
 EX_DIR = f'{DATA_DIR}/grid_global/{CYCLE_POINT}'
 EXTENT = [-10, 3, 48.5, 63.5]
 REGION_ORDER = ['SKERRY', 'PORTREE', 'RATTRAY', 'TYNE', 'BELFAST', 'HOLYHEAD',
                 'BARNSLEY', 'HUMBER', 'SCILLIES', 'WESSEX', 'CHATHAM',
                 'PORTLAND', 'YARMOUTH', 'COTSWOLD', 'SHETLAND', 'ORKNEY',
                 'MARLIN', 'PETREL', 'SKUA', 'PUFFIN']
+
 # Stop iris future warnings
 iris.FUTURE.date_microseconds = True
 
@@ -136,7 +139,7 @@ def get_cube(vt_dt):
     # Create directory to put data in
     if not os.path.exists(EX_DIR):
         os.makedirs(EX_DIR)
-        
+
     # Create valid time string
     vt_str = vt_dt.strftime('%Y%m%dT%H%MZ')
 
