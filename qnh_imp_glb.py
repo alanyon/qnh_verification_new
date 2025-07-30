@@ -50,13 +50,11 @@ def main():
     # Need valid time string 5 hours after cycle point
     cycle_dt = datetime.strptime(CYCLE_POINT, '%Y%m%dT%H%MZ')
     vt_dt = cycle_dt + timedelta(hours=5)
-
-    # Assume forecast is 2 hours befor valid time. This matches what is
-    # done in verification
-    ft_str = (vt_dt - timedelta(hours=2)).strftime('%Y%m%d%H%MZ')
+    vt_str1 = vt_dt.strftime('%Y%m%dT%H%MZ')
+    vt_str2 = vt_dt.strftime('%Y%m%d%H%MZ')
 
     # Extract data from MASS
-    cube = get_cube(vt_dt)
+    cube = get_cube(vt_str1)
 
     # Exit if no cube found
     if cube is None:
@@ -78,14 +76,14 @@ def main():
             lowest_mslp = find_lowest_mslp_in_polygon(cube_perc, polygon)
 
             # Add min MSLP to a .dat file
-            dat_fname = f'{DATA_DIR}/min_mslps/imp_{perc}_QNH_{ft_str}.dat'
+            dat_fname = f'{DATA_DIR}/min_mslps/imp_{perc}_QNH_{vt_str2}.dat'
             with open(dat_fname, 'a', encoding='utf-8') as file:
                 file.write(f'{lowest_mslp}\n')
 
             # Also do the min - 3 for 50th percentile
             if perc == 50:
                 dat_fname = (f'{DATA_DIR}/min_mslps/imp_{perc}_minus_3_QNH_'
-                             f'{ft_str}.dat')
+                             f'{vt_str2}.dat')
                 with open(dat_fname, 'a', encoding='utf-8') as file:
                     file.write(f'{lowest_mslp - 3}\n')
 
@@ -126,22 +124,19 @@ def find_lowest_mslp_in_polygon(cube, polygon):
     return min_val
 
 
-def get_cube(vt_dt):
+def get_cube(vt_str):
     """
     Gets the IMPROVER data for the specified cycle point and returns as
     a cube.
 
     Args:
-        vt_dt (datetime): Valid time for the data extraction.
+        vt_str (str): Valid time string in the format 'YYYYMMDDTHHMMZ'.
     Returns:
         cube(iris.cube.Cube): Cube containing the IMPROVER data.
     """
     # Create directory to put data in
     if not os.path.exists(EX_DIR):
         os.makedirs(EX_DIR)
-
-    # Create valid time string
-    vt_str = vt_dt.strftime('%Y%m%dT%H%MZ')
 
     # Ensure directory exists
     for os_num in ['OS45.2', 'OS46']:
