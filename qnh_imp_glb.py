@@ -145,11 +145,11 @@ def get_cube(vt_dt):
 
     # Ensure directory exists
     for os_num in ['OS45.2', 'OS46']:
-        m_path = f'{MOO_DIR}/{os_num}/engl_suite_{CYCLE_POINT}'
+        m_path = f'{MOO_DIR}/{os_num}/engl_suite_{CYCLE_POINT}/grid.tar'
         if os.system(f'moo ls {m_path} > /dev/null 2>&1') == 0:
 
             # If file exists in MASS, extract it
-            os.system(f'moo get {m_path} {EX_DIR}')
+            os.system(f'moo get {m_path} {EX_DIR}/')
 
             # Untar required file
             mslp_fname = (f'grid/percentile_extract_{vt_str}-'
