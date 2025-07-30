@@ -20,9 +20,8 @@ from shapely.geometry import Point, Polygon
 # Define data directory
 DATA_DIR = '/data/users/andre.lanyon/QNH'
 CYCLE_POINT = '20250713T1800Z'
-DIR_NUM = 1
 MOO_DIR = 'moose:/adhoc/users/ppdev'
-EX_DIR = f'{DATA_DIR}/grid_global/{DIR_NUM}'
+EX_DIR = f'{DATA_DIR}/grid_global/{CYCLE_POINT}'
 EXTENT = [-10, 3, 48.5, 63.5]
 REGION_ORDER = ['SKERRY', 'PORTREE', 'RATTRAY', 'TYNE', 'BELFAST', 'HOLYHEAD',
                 'BARNSLEY', 'HUMBER', 'SCILLIES', 'WESSEX', 'CHATHAM',
@@ -87,6 +86,9 @@ def main():
                 with open(dat_fname, 'a', encoding='utf-8') as file:
                     file.write(f'{lowest_mslp - 3}\n')
 
+    # Remove extracted data
+    os.system(f'rm -rf {EX_DIR}')
+
 
 def find_lowest_mslp_in_polygon(cube, polygon):
     """
@@ -131,9 +133,10 @@ def get_cube(vt_dt):
     Returns:
         cube(iris.cube.Cube): Cube containing the IMPROVER data.
     """
-    # Remove existing data
-    os.system(f'rm -r {EX_DIR}/*')
-
+    # Create directory to put data in
+    if not os.path.exists(EX_DIR):
+        os.makedirs(EX_DIR)
+        
     # Create valid time string
     vt_str = vt_dt.strftime('%Y%m%dT%H%MZ')
 
