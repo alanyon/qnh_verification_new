@@ -1,0 +1,227 @@
+"""
+Script to load the IMPROVER data and find the lowest mean sea level
+pressure (MSLP) in each FOQNH region for the 50th percentile.
+
+Functions:
+    main: Main function calling other functions.
+    find_lowest_mslp_in_polygon: Finds the lowest MSLP in given polygon.
+    get_cube: Gets the IMPROVER data for the specified cycle point.
+    get_regions: Gets the FOQNH regions from the shapefile.
+"""
+import os
+import sys
+from datetime import datetime, timedelta
+
+import iris
+import numpy as np
+import cartopy.feature as feature
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+import shapefile as shp
+from shapely.geometry import Point, Polygon
+import iris.plot as iplt
+
+# Define environment constants
+DATA_DIR = os.environ['DATA_DIR']
+CYCLE_POINT = os.environ['CYCLE_POINT']
+MOO_DIR = os.environ['MOO_DIR']
+
+# Other constants
+EX_DIR = f'{DATA_DIR}/grid_global_test/{CYCLE_POINT}'
+EXTENT = [-10, 3, 48.5, 63.5]
+REGION_ORDER = ['SKERRY', 'PORTREE', 'RATTRAY', 'TYNE', 'BELFAST', 'HOLYHEAD',
+                'BARNSLEY', 'HUMBER', 'SCILLIES', 'WESSEX', 'CHATHAM',
+                'PORTLAND', 'YARMOUTH', 'COTSWOLD', 'SHETLAND', 'ORKNEY',
+                'MARLIN', 'PETREL', 'SKUA', 'PUFFIN']
+
+# Stop iris future warnings
+iris.FUTURE.date_microseconds = True
+
+
+def main():
+    """
+    Main function to load the IMPROVER data and find lowest MSLP in
+    each FOQNH region.
+
+    Args:
+        None
+    Returns:
+        None
+    """
+    # Get FOQNH region coordinates
+    regions = get_regions()
+
+    # Need valid time string 5 hours after cycle point
+    cycle_dt = datetime.strptime(CYCLE_POINT, '%Y%m%dT%H%MZ')
+    vt_dt = cycle_dt + timedelta(hours=5)
+    vt_str1 = vt_dt.strftime('%Y%m%dT%H%MZ')
+
+    # Extract data from MASS
+    cube = get_cube(vt_str1)
+
+    # Exit if no cube found
+    if cube is None:
+        sys.exit()
+
+    # Get cube just required percentile
+    cube_perc = cube.extract(iris.Constraint(percentile=50))
+
+    # Plot data on map using latitude and longitude coordinates
+    map_crs = ccrs.TransverseMercator()
+    fig, ax = plt.subplots(figsize=(20, 20), 
+                           subplot_kw={'projection': map_crs})
+
+    iplt.pcolormesh(cube_perc, cmap='jet')
+
+    # Add colorbar
+    cbar = plt.colorbar(ax=ax, orientation='horizontal', pad=0.05, 
+                        aspect=50, shrink=0.8)
+    cbar.set_label('Pressure at Mean Sea Level (hPa)', fontsize=14)
+
+    # Draw coastlines and background stuff
+    ax.add_feature(feature.COASTLINE,linewidth=0.8)
+    ax.add_feature(feature.BORDERS, linestyle=':',linewidth=0.4)
+    ax.set_extent([-10, 3, 48.5, 63.5], crs=ccrs.PlateCarree())
+    ax.gridlines(draw_labels=True, linewidth=0.4)
+
+    # Loop through each region
+    for area_name, coords in regions.items():
+
+        # Create a polygon from the coordinates
+        polygon = Polygon(coords)
+
+        # Define the centroid and exterior of the polygon
+        centroid = polygon.centroid
+        x, y = polygon.exterior.xy
+
+        # Find the lowest MSLP in the polygon for that percentile
+        lowest_mslp = find_lowest_mslp_in_polygon(cube_perc, polygon)
+
+        # Plot the polygon and annotate with area name and lowest MSLP
+        ax.plot(x, y, color='red', linewidth=1, transform=ccrs.PlateCarree())
+        txt = f'{area_name}\n{lowest_mslp:.1f} hPa'
+        ax.text(centroid.x, centroid.y, txt, 
+            fontsize=12, ha='center', va='center', color='white',
+            fontweight='bold',
+            transform=ccrs.PlateCarree())
+
+    # Save and close plot
+    fig.savefig('cube_50th_minus_3_plot_global.png', bbox_inches='tight')
+    plt.close()
+
+    # # Remove extracted data
+    # os.system(f'rm -rf {EX_DIR}')
+
+
+def find_lowest_mslp_in_polygon(cube, polygon):
+    """
+    Finds the lowest mean sea level pressure (MSLP) in a given polygon
+    within the cube.
+
+    Args:
+        cube (iris.cube.Cube): The input cube containing MSLP data.
+        polygon (shapely.geometry.Polygon): The polygon to check.
+    Returns:
+        float: The lowest MSLP value found within the polygon.
+    """
+    # Get latitude and longitude coordinates and flatten them
+    lat = cube.coord('latitude').points
+    lon = cube.coord('longitude').points
+    lon_grid, lat_grid = np.meshgrid(lon, lat)
+    lat_flat = lat_grid.flatten()
+    lon_flat = lon_grid.flatten()
+
+    # Get data and flatten it
+    data_flat = cube.data.flatten()
+
+    # Create a list of values that are within the polygon
+    values_in_polygon = [
+        data for data, x, y in zip(data_flat, lon_flat, lat_flat)
+        if polygon.contains(Point(x, y))
+    ]
+
+    # Find minimum value in the polygon (as an integer)
+    min_val = int(min(values_in_polygon))
+
+    return min_val
+
+
+def get_cube(vt_str):
+    """
+    Gets the IMPROVER data for the specified cycle point and returns as
+    a cube.
+
+    Args:
+        vt_str (str): Valid time string in the format 'YYYYMMDDTHHMMZ'.
+    Returns:
+        cube(iris.cube.Cube): Cube containing the IMPROVER data.
+    """
+    # Create directory to put data in
+    if not os.path.exists(EX_DIR):
+        os.makedirs(EX_DIR)
+
+    # Ensure directory exists
+    for os_num in ['OS45.2', 'OS46']:
+        m_path = f'{MOO_DIR}/{os_num}/engl_suite_{CYCLE_POINT}/grid.tar'
+        if os.system(f'moo ls {m_path} > /dev/null 2>&1') == 0:
+
+            # If file exists in MASS, extract it
+            # os.system(f'moo get {m_path} {EX_DIR}/')
+
+            # Untar required file
+            mslp_fname = (f'grid/percentile_extract_{vt_str}-'
+                          'PT0005H00M-pressure_at_mean_sea_level.nc')
+            # os.system(f'tar -xvf {EX_DIR}/grid.tar -C {EX_DIR} {mslp_fname}')
+
+            # Load the data using iris
+            cube = iris.load_cube(f'{EX_DIR}/{mslp_fname}')
+
+            # Constrain cube using extents
+            cube = cube.intersection(longitude=(EXTENT[0], EXTENT[1]),
+                                     latitude=(EXTENT[2], EXTENT[3]))
+
+            # Convert units to hPa
+            cube.convert_units('hPa')
+
+            return cube
+
+    # If no file found, return None
+    print(f'No IMPROVER data found for cycle point {CYCLE_POINT}')
+    return None
+
+
+def get_regions():
+    """
+    Gets the FOQNH regions from the shapefile and returns as a
+    dictionary.
+
+    Args:
+        None
+    Returns:
+        regions(dict): Dictionary of region names and their coordinates.
+    """
+    # Load the shapefile containing the FOQNH regions
+    shapes = shp.Reader(f'{DATA_DIR}/MO_ForecastQNHRegions.shp')
+
+    # Create a dictionary to hold the region names and their coordinates
+    regions = {}
+    for shape_rec in shapes.shapeRecords():
+        name = shape_rec.record[0]
+        shape = shape_rec.shape
+        coords = shape.points
+        regions[name] = coords
+
+    # Check names are all there and in same order used in verification
+    msg = 'Region names do not match expected order or are missing.'
+    assert set(regions.keys()) == set(REGION_ORDER), msg
+
+    return regions
+
+
+if __name__ == "__main__":
+    t1 = datetime.now()
+    main()
+    t2 = datetime.now()
+    # print time in seconds
+    time_taken = (t2 - t1).total_seconds()
+    print(f'Finished in {time_taken} seconds')
