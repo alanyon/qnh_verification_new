@@ -49,12 +49,11 @@ def main():
 
     # Need valid time string 5 hours after cycle point
     cycle_dt = datetime.strptime(CYCLE_POINT, '%Y%m%dT%H%MZ')
-    vt_dt = cycle_dt + timedelta(hours=5)
-    vt_str1 = vt_dt.strftime('%Y%m%dT%H%MZ')
-    vt_str2 = vt_dt.strftime('%Y%m%d%H%MZ')
+    vt_dts = [cycle_dt + timedelta(hours=5), cycle_dt + timedelta(hours=6)]
+    vt_str = vt_dts[0].strftime('%Y%m%d%H%MZ')
 
     # Extract data from MASS
-    cube = get_cube(vt_str1)
+    cube = get_cube(vt_dts)
 
     # Exit if no cube found
     if cube is None:
@@ -83,7 +82,7 @@ def main():
             # Also do the min - 3 for 50th percentile
             if perc == 50:
                 dat_fname = (f'{DATA_DIR}/min_mslps/imp_{perc}_minus_3_QNH_'
-                             f'{vt_str2}.dat')
+                             f'{vt_str}.dat')
                 with open(dat_fname, 'a', encoding='utf-8') as file:
                     file.write(f'{lowest_mslp - 3}\n')
 
@@ -124,16 +123,19 @@ def find_lowest_mslp_in_polygon(cube, polygon):
     return min_val
 
 
-def get_cube(vt_str):
+def get_cube(vt_dts):
     """
     Gets the IMPROVER data for the specified cycle point and returns as
     a cube.
 
     Args:
-        vt_str (str): Valid time string in the format 'YYYYMMDDTHHMMZ'.
+        vt_dts (list): List of valid time datetimes.
     Returns:
         cube(iris.cube.Cube): Cube containing the IMPROVER data.
     """
+    # Get valid time strs
+    vt_strs = [dt.strftime('%Y%m%dT%H%MZ') for dt in vt_dts]
+
     # Create directory to put data in
     if not os.path.exists(EX_DIR):
         os.makedirs(EX_DIR)
@@ -147,19 +149,30 @@ def get_cube(vt_str):
             os.system(f'moo get {m_path} {EX_DIR}/')
 
             # Untar required file
-            mslp_fname = (f'grid/percentile_extract_{vt_str}-'
-                          'PT0005H00M-pressure_at_mean_sea_level.nc')
-            os.system(f'tar -xvf {EX_DIR}/grid.tar -C {EX_DIR} {mslp_fname}')
+            mslp_fname_1 = (f'grid/percentile_extract_{vt_strs[0]}-'
+                            'PT0005H00M-pressure_at_mean_sea_level.nc')
+            mslp_fname_2 = (f'grid/percentile_extract_{vt_strs[1]}-'
+                            'PT0006H00M-pressure_at_mean_sea_level.nc')
+            os.system(f'tar -xvf {EX_DIR}/grid.tar -C {EX_DIR} {mslp_fname_1}')
+            os.system(f'tar -xvf {EX_DIR}/grid.tar -C {EX_DIR} {mslp_fname_2}')
 
             # Load the data using iris
-            cube = iris.load_cube(f'{EX_DIR}/{mslp_fname}')
+            cube_1 = iris.load_cube(f'{EX_DIR}/{mslp_fname_1}')
+            cube_2 = iris.load_cube(f'{EX_DIR}/{mslp_fname_2}')
 
             # Constrain cube using extents
-            cube = cube.intersection(longitude=(EXTENT[0], EXTENT[1]),
-                                     latitude=(EXTENT[2], EXTENT[3]))
+            cube_1 = cube_1.intersection(longitude=(EXTENT[0], EXTENT[1]),
+                                         latitude=(EXTENT[2], EXTENT[3]))
+            cube_2 = cube_2.intersection(longitude=(EXTENT[0], EXTENT[1]),
+                                         latitude=(EXTENT[2], EXTENT[3]))
 
             # Convert units to hPa
-            cube.convert_units('hPa')
+            cube_1.convert_units('hPa')
+            cube_2.convert_units('hPa')
+
+            # Get cube with minimum MSLPs from the two cubes
+            cube = iris.cube.CubeList([cube_1, cube_2]).merge_cube()
+            cube = cube.collapsed(['longitude', 'latitude'], iris.analysis.MIN)
 
             return cube
 
