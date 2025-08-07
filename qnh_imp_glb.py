@@ -75,7 +75,7 @@ def main():
             lowest_mslp = find_lowest_mslp_in_polygon(cube_perc, polygon)
 
             # Add min MSLP to a .dat file
-            dat_fname = f'{DATA_DIR}/min_mslps/imp_{perc}_QNH_{vt_str2}.dat'
+            dat_fname = f'{DATA_DIR}/min_mslps/imp_{perc}_QNH_{vt_str}.dat'
             with open(dat_fname, 'a', encoding='utf-8') as file:
                 file.write(f'{lowest_mslp}\n')
 
@@ -172,7 +172,7 @@ def get_cube(vt_dts):
 
             # Get cube with minimum MSLPs from the two cubes
             cube = iris.cube.CubeList([cube_1, cube_2]).merge_cube()
-            cube = cube.collapsed(['longitude', 'latitude'], iris.analysis.MIN)
+            cube = cube.collapsed(['time'], iris.analysis.MIN)
 
             return cube
 
