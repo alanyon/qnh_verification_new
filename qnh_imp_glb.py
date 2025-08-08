@@ -49,8 +49,8 @@ def main():
 
     # Need valid time string 5 hours after cycle point
     cycle_dt = datetime.strptime(CYCLE_POINT, '%Y%m%dT%H%MZ')
-    vt_dts = [cycle_dt + timedelta(hours=5), cycle_dt + timedelta(hours=6)]
-    vt_str = vt_dts[0].strftime('%Y%m%d%H%MZ')
+    vt_dts = [cycle_dt + timedelta(hours=4), cycle_dt + timedelta(hours=5)]
+    vt_str = vt_dts[1].strftime('%Y%m%d%H%MZ')
 
     # Extract data from MASS
     cube = get_cube(vt_dts)
