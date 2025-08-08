@@ -150,9 +150,9 @@ def get_cube(vt_dts):
 
             # Untar required file
             mslp_fname_1 = (f'grid/percentile_extract_{vt_strs[0]}-'
-                            'PT0005H00M-pressure_at_mean_sea_level.nc')
+                            'PT0004H00M-pressure_at_mean_sea_level.nc')
             mslp_fname_2 = (f'grid/percentile_extract_{vt_strs[1]}-'
-                            'PT0006H00M-pressure_at_mean_sea_level.nc')
+                            'PT0005H00M-pressure_at_mean_sea_level.nc')
             os.system(f'tar -xvf {EX_DIR}/grid.tar -C {EX_DIR} {mslp_fname_1}')
             os.system(f'tar -xvf {EX_DIR}/grid.tar -C {EX_DIR} {mslp_fname_2}')
 
